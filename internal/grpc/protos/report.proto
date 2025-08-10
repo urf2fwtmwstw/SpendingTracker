@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+service ReportService{
+    rpc CreateReport(ReportRequest) returns (ReportResponse);
+}
+
+message ReportRequest{
+    string user_id = 1;
+    string year_month = 2;
+}
+
+message ReportResponse{
+    string report_id = 1;
+}
