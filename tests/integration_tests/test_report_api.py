@@ -1,4 +1,5 @@
 import datetime
+import time
 
 from fastapi.testclient import TestClient
 
@@ -168,6 +169,7 @@ def test_get_report(
         registered_test_user_data,
     )
     report_id: str = get_report_id(client, registered_test_user_data)
+    time.sleep(5)
     response = client.get(
         "api/v1/get_report",
         params={"report_id": report_id},

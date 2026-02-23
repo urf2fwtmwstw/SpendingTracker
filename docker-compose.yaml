@@ -1,0 +1,77 @@
+services:
+  database:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: SpendingTrackerDB
+    ports:
+      - '5432:5432'
+
+  kafka:
+    image: 'bitnami/kafka'
+    ports:
+      - "9092:9092"   # External listener
+      - "29092:29092" # Internal listener
+    environment:
+      # KRaft settings, to start kafka without Zookeeper
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:29093
+
+      # Listeners configuration, doesn't really matter for local development
+      # If you're actually interested in these params, just google them
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,EXTERNAL://0.0.0.0:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29092,EXTERNAL://localhost:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+
+      # Performance & reliability settings
+      - KAFKA_CFG_NUM_PARTITIONS=3 # Number of partitions per topic
+      - KAFKA_CFG_DEFAULT_REPLICATION_FACTOR=1 # How many brokers will replicate each message
+      - KAFKA_CFG_MIN_INSYNC_REPLICAS=1 # How many in-sync replicas are required to commit a message
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true # Allow topics to be created automatically
+
+      # Log settings
+      - KAFKA_CFG_LOG_RETENTION_HOURS=24 # How long to retain data
+    volumes:
+      - kafka_data:/bitnami/kafka
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - kafka-net
+
+  kafka-ui:
+    image: 'provectuslabs/kafka-ui:latest'
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
+      - KAFKA_CLUSTERS_0_METRICS_PORT=9092
+      # Optional authentication for UI
+      - AUTH_TYPE=disabled  # Change to 'LOGIN_FORM' to enable authentication
+      # - SPRING_SECURITY_USER_NAME=admin  # Uncomment to set username
+      # - SPRING_SECURITY_USER_PASSWORD=admin  # Uncomment to set password
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q --spider http://localhost:8080/actuator/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - kafka-net
+
+volumes:
+  kafka_data:
+    driver: local
+
+networks:
+  kafka-net:
+    driver: bridge

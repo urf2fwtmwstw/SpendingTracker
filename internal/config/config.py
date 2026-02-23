@@ -38,14 +38,23 @@ class Logger(BaseModel):
     log_level: str = "INFO"
 
 
+class Kafka(BaseModel):
+    host: str = "localhost"
+    port: int = 9092
+
 class Settings(BaseModel):
     logger: Logger
     database: Database
+    kafka: Kafka
     auth_jwt: AuthJWT = AuthJWT()
 
     @property
     def DATABASE_URL(self):
         return f"postgresql+asyncpg://{self.database.username}:{self.database.password}@{self.database.host}/{self.database.name}"
+
+    @property
+    def KAFKA_URL(self) -> str:
+        return f"{self.kafka.host}:{self.kafka.port}"
 
 
 settings = Settings(**yamlconfig())

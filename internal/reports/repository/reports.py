@@ -2,14 +2,15 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from internal.databases.models import Report as ReportModel
-from internal.schemas.report_schema import ReportSchema
+from internal.databases.models import ReportStatus
+from internal.schemas.report_schema import BlankReportSchema, ReportSchema
 
 
 class ReportsRepository:
     @staticmethod
     async def add_report(
         async_session: async_sessionmaker[AsyncSession],
-        report_data: ReportSchema,
+        report_data: BlankReportSchema,
     ) -> None:
         async with async_session() as session:
             report = ReportModel(
@@ -22,6 +23,21 @@ class ReportsRepository:
             await session.commit()
 
     @staticmethod
+    async def get_created_reports(
+        async_session: async_sessionmaker[AsyncSession],
+    ) -> list[ReportSchema]:
+        async with async_session() as session:
+            statement = select(ReportModel).filter(
+                ReportModel.status == ReportStatus.created
+            )
+            result = await session.execute(statement)
+            created_reports: list[ReportSchema] = [
+                ReportSchema.model_validate(created_report)
+                for created_report in result.scalars()
+            ]
+            return created_reports
+
+    @staticmethod
     async def get_report(
         async_session: async_sessionmaker[AsyncSession],
         report_id: str,
@@ -30,17 +46,7 @@ class ReportsRepository:
             statement = select(ReportModel).filter(ReportModel.report_id == report_id)
             result = await session.execute(statement)
             reportDB: ReportModel = result.scalars().one()
-            report = ReportSchema(
-                report_id=reportDB.report_id,
-                report_created=reportDB.report_created,
-                report_year_month=reportDB.report_year_month,
-                month_income=reportDB.month_income,
-                month_expenses=reportDB.month_expenses,
-                balance=reportDB.balance,
-                most_expensive_categories=reportDB.most_expensive_categories,
-                user_id=reportDB.user_id,
-                status=reportDB.status,
-            )
+            report = ReportSchema.model_validate(reportDB)
             return report
 
     @staticmethod

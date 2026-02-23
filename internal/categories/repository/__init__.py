@@ -1,1 +1,1 @@
-from internal.categories.repository.categories import CategoriesRepository
+from internal.categories.repository.categories import CategoriesRepository as CategoriesRepository

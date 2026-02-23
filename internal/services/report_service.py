@@ -4,7 +4,11 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from internal.reports.repository import ReportsRepository
-from internal.schemas.report_schema import ReportSchema, ReportStatus
+from internal.schemas.report_schema import (
+    BlankReportSchema,
+    ReportSchema,
+    ReportStatus,
+)
 from internal.schemas.transaction_schema import TransactionSchema
 from internal.schemas.user_schema import UserSchema
 from internal.services.transaction_service import TransactionService
@@ -25,17 +29,17 @@ class ReportService:
     @staticmethod
     async def __get_month_dependant_attributes(
         report_month_transactions: list[TransactionSchema],
-    ) -> dict[str:float, str:float, str : dict[str:float]]:
+    ) -> dict[str, float | dict[str, float]]:
         month_income: float = 0
         month_expenses: float = 0
-        expenses_in_category: dict[str:float] = {}
+        expenses_in_category: dict[str, float] = {}
         for transaction in report_month_transactions:
             if transaction.transaction_type == "income":
                 month_income += transaction.transaction_value
             else:
                 expense_value: float = transaction.transaction_value
                 month_expenses += expense_value
-                category_id: str = transaction.category_id
+                category_id = str(transaction.category_id)
                 expenses_in_category[category_id] = (
                     expenses_in_category.get(category_id, 0) + expense_value
                 )
@@ -57,7 +61,7 @@ class ReportService:
 
     # sort dictionary of {category_id: expenses} by value and return a string with ids of the most expensive categories
     @staticmethod
-    async def __sort_category_dict(expense_categories: dict[str:float]) -> str:
+    async def __sort_category_dict(expense_categories: dict[str, float]) -> str:
         most_expensive_categories_ids = [
             str(category_id)
             for category_id, expenses in sorted(
@@ -71,21 +75,19 @@ class ReportService:
     async def create_report(
         self,
         session: async_sessionmaker[AsyncSession],
-        user_id: str,
-        report_id: uuid,
-        report_year: int,
-        report_month: int,
+        blank_report: BlankReportSchema,
     ) -> None:
-        report = ReportSchema(
-            report_id=report_id,
-            user_id=user_id,
-            report_year_month=str(report_year) + "-" + str(report_month),
-            status=ReportStatus.created,
-        )
-        await self.repo.add_report(session, report)
+        await self.repo.add_report(session, blank_report)
+
+    async def fill_report(
+        self,
+        session: async_sessionmaker[AsyncSession],
+        report_id: str,
+    ):
+        report: ReportSchema = await self.get_report(session, report_id)
         try:
-            await self.generate_report(session, report, report_year, report_month)
-        except:
+            await self.generate_report(session, report)
+        except Exception:
             report.status = ReportStatus.failed
             await self.repo.update_report(session, report)
 
@@ -93,10 +95,13 @@ class ReportService:
         self,
         session: async_sessionmaker[AsyncSession],
         report: ReportSchema,
-        report_year: int,
-        report_month: int,
     ) -> None:
-        user_id = report.user_id
+        user_id: str = str(report.user_id)
+        report_year_month: list[int] = list(
+            map(int, report.report_year_month.split("-"))
+        )
+        report_year: int = report_year_month[0]
+        report_month: int = report_year_month[1]
         transactions: list[
             TransactionSchema
         ] = await self.transaction_service.get_transactions(session, user_id)
@@ -111,7 +116,7 @@ class ReportService:
         )
         month_income: float = month_dependant_attributes["month_income"]
         month_expenses: float = month_dependant_attributes["month_expenses"]
-        expenses_in_category: dict[str:float] = month_dependant_attributes[
+        expenses_in_category: dict[str, float] = month_dependant_attributes[
             "expenses_in_category"
         ]
         most_expensive_categories: str = await self.__sort_category_dict(
@@ -135,20 +140,38 @@ class ReportService:
     ) -> None:
         async_tasks = []
         users: list[UserSchema] = await self.user_service.get_users(session)
-        user_ids: list[str] = [str(user.user_id) for user in users]
 
-        for user_id in user_ids:
+        for user in users:
+            report_data = BlankReportSchema(
+                user_id=user.user_id,
+                report_id=uuid.uuid4(),
+                report_year_month=str(report_year) + "-" + str(report_month),
+            )
             task = asyncio.create_task(
                 self.create_report(
                     session,
-                    user_id,
-                    uuid.uuid4(),
-                    report_year,
-                    report_month,
+                    report_data,
                 )
             )
             async_tasks.append(task)
+        await asyncio.gather(*async_tasks)
 
+    async def fill_created_reports(
+        self,
+        session: async_sessionmaker[AsyncSession],
+    ) -> None:
+        async_tasks = []
+        created_reports: list[ReportSchema] = await self.repo.get_created_reports(
+            session
+        )
+        for report in created_reports:
+            task = asyncio.create_task(
+                self.fill_report(
+                    session,
+                    str(report.report_id),
+                ),
+            )
+            async_tasks.append(task)
         await asyncio.gather(*async_tasks)
 
     async def get_report(

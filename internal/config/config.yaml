@@ -6,3 +6,6 @@ database:
   host: localhost
   port: 5432
   name: SpendingTrackerDB
+kafka:
+  host: localhost
+  port: 9092
