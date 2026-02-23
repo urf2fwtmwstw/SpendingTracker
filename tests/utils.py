@@ -5,12 +5,12 @@ from fastapi.testclient import TestClient
 
 
 def generate_user(
-    username: str = f"test_username_{random.randint(100, 1000)}",
-    password: str = f"password{random.randint(100, 1000)}",
+    username: str = None,
+    password: str = None,
 ) -> dict[str, str]:
     return {
-        "username": username,
-        "password": password,
+        "username": username or f"test_username_{random.randint(1000, 999999)}",
+        "password": password or f"password{random.randint(1000, 999999)}",
     }
 
 

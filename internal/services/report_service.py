@@ -87,7 +87,7 @@ class ReportService:
         report: ReportSchema = await self.get_report(session, report_id)
         try:
             await self.generate_report(session, report)
-        except:
+        except Exception:
             report.status = ReportStatus.failed
             await self.repo.update_report(session, report)
 
