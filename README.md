@@ -1,85 +1,102 @@
-# SpendingTracker
+# Заметки о Трекере Расходов (SpendingTracker)
 
-SpendingTracker is a FastAPI-based web service that provides functional REST APIs to manage personal spending, categories, reports, and transactions. 
+SpendingTracker — это веб-сервис на базе FastAPI, который предоставляет функциональные REST API для управления личными расходами, категориями, отчетами и транзакциями.
 
-## Features
-- **Auth**: User signup, signin (JWT), and profile updates.
-- **Categories**: Create, read, update, delete expense categories.
-- **Transactions**: Record and track transactions.
-- **Reports**: Request spending reports efficiently managed through Apache Kafka and processed using background tasks.
+## Особенности
+- **Аутентификация (Auth)**: Регистрация пользователей, вход (JWT) и обновление профиля.
+- **Категории (Categories)**: Создание, чтение, обновление, удаление категорий расходов.
+- **Транзакции (Transactions)**: Запись и отслеживание транзакций.
+- **Отчеты (Reports)**: Запрос отчетов по расходам, которые эффективно управляются через Apache Kafka и обрабатываются фоновыми задачами.
 
-## Setup and Installation
+## Внутренние Сервисы
 
-The project uses `make` commands to simplify setting up the environment.
+Логика структуры приложения разделена на следующие внутренние сервисы:
+- **Сервис Категорий (Category Service)**: Управляет созданием, получением, обновлением и удалением категорий расходов.
+- **Сервис Отчетов (Report Service)**: Обрабатывает асинхронное создание отчетов по расходам с использованием фоновых задач Kafka.
+- **Сервис Транзакций (Transaction Service)**: Обрабатывает и записывает доходы и расходы пользователя.
+- **Сервис Пользователей (User Service)**: Управляет учетными записями пользователей, аутентификацией и обновлениями профиля.
 
-### 1. Requirements
-Ensure you have Python 3 and `make` installed.
+## Установка и Настройка
 
-### 2. Generate RSA Keys (for JWT)
+Docker — единственное строгое требование для этого проекта! Git опционален, так как вы можете скачать исходный код в виде ZIP-архива.
+
+### Предварительные Требования
+Перед началом работы убедитесь, что вы установили и запустили:
+- **[Docker Desktop](https://docs.docker.com/get-docker/)** (Пожалуйста, убедитесь, что Docker Engine запущен!)
+- **[Git](https://git-scm.com/downloads)** (Опционально, для клонирования репозитория)
+
+### 1. Получение Исходного Кода
+Вы можете клонировать репозиторий через Git или скачать ZIP-архив:
+
+**Вариант А: Использование Git**
 ```bash
-make generate_RSA_keys
+git clone https://github.com/yourusername/SpendingTracker.git
+cd SpendingTracker
 ```
 
-### 3. Build Environment
-Create a virtual environment (`venv`) and install dependencies:
+**Вариант Б: Скачивание ZIP-архива**
+1. Нажмите зеленую кнопку **Code** на странице репозитория GitHub и выберите **Download ZIP**.
+2. Распакуйте скачанный архив.
+3. Откройте терминал и перейдите в извлеченную папку:
 ```bash
-make build
+cd SpendingTracker
+```
+(Все последующие команды выполняются из этой папки).
+
+### 2. Подготовка Образа Kafka
+Оригинальный образ `bitnami/kafka` больше не хостится активно под этим именем. Чтобы исправить это, загрузите старый образ и локально добавьте ему тег:
+```bash
+docker pull bitnamilegacy/kafka
+docker tag bitnamilegacy/kafka bitnami/kafka
 ```
 
-### 4. Database Migrations
-To generate new Alembic migrations:
+### 3. Сборка и Запуск
+Соберите образ приложения из Dockerfile и запустите бэкенд сервисы:
 ```bash
-make new_migration
+docker build -t api .
+docker-compose up -d
 ```
 
-To apply migrations to the database:
-```bash
-make migrate
-```
+## Запуск Приложения
+Сервер станет доступен вскоре после запуска по адресу `http://localhost:8000`. 
+Чтобы изучить API и взаимодействовать с ним, перейдите по URL-адресу Swagger UI:
+- `http://localhost:8000/docs`
 
-## Running the Application
+## Тестирование и Линтинг
 
-To start the FastAPI web server using `uvicorn`:
-```bash
-make run
-```
-The server will be available at `http://localhost:8000`.
-
-## Testing and Linting
-
-**Run Linter (ruff):**
+**Запуск Линтера (ruff):**
 ```bash
 make lint
 ```
 
-**Run Tests (pytest):**
+**Запуск Тестов (pytest):**
 ```bash
 make test
 ```
 
-## API Endpoints
+## Конечные Точки API (API Endpoints)
 
-### Auth
-- `POST /signup`: Register a new user and receive a JWT.
-- `POST /signin`: Sign in.
-- `GET /verify`: Get current user info.
-- `PATCH /users/{user_id}`: Update user data.
+### Аутентификация (Auth)
+- `POST /signup`: Регистрация нового пользователя и получение JWT.
+- `POST /signin`: Вход.
+- `GET /verify`: Получить информацию о текущем пользователе.
+- `PATCH /users/{user_id}`: Обновить данные пользователя.
 
-### Categories
-- `GET /`: Get all categories for the authenticated user.
-- `POST /`: Create a new category.
-- `GET /{category_id}`: Get category details.
-- `PUT /{category_id}`: Update a category.
-- `DELETE /{category_id}`: Delete a category.
+### Категории (Categories)
+- `GET /`: Получить все категории для аутентифицированного пользователя.
+- `POST /`: Создать новую категорию.
+- `GET /{category_id}`: Получить детали категории.
+- `PUT /{category_id}`: Обновить категорию.
+- `DELETE /{category_id}`: Удалить категорию.
 
-### Transactions
-- `GET /`: List all user transactions.
-- `POST /`: Create a new transaction.
-- `GET /{transaction_id}`: Show transaction details.
-- `PUT /{transaction_id}`: Edit a transaction.
-- `DELETE /{transaction_id}`: Remove a transaction.
+### Транзакции (Transactions)
+- `GET /`: Список всех транзакций пользователя.
+- `POST /`: Создать новую транзакцию.
+- `GET /{transaction_id}`: Показать детали транзакции.
+- `PUT /{transaction_id}`: Изменить транзакцию.
+- `DELETE /{transaction_id}`: Удалить транзакцию.
 
-### Reports
-- `POST /create_report`: Create a new report (processes asynchronously via Kafka).
-- `GET /get_report`: Get report by ID.
-- `DELETE /delete_report`: Delete a report.
+### Отчеты (Reports)
+- `POST /create_report`: Создать новый отчет (обрабатывается асинхронно через Kafka).
+- `GET /get_report`: Получить отчет по ID.
+- `DELETE /delete_report`: Удалить отчет.
