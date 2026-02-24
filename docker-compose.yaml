@@ -8,6 +8,13 @@ services:
       POSTGRES_DB: SpendingTrackerDB
     ports:
       - '5432:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d SpendingTrackerDB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kafka-net
 
   kafka:
     image: 'bitnami/kafka'
@@ -65,6 +72,24 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - kafka-net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=database
+      - KAFKA_HOST=kafka
+      - KAFKA_PORT=29092
+    depends_on:
+      database:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks:
       - kafka-net
 
